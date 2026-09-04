@@ -1698,7 +1698,7 @@ class EntsoePandasClient(EntsoeRawClient):
         return df
 
 
-    @year_limited
+    @month_limited
     def query_crossborder_flows(
             self, country_code_from: Union[Area, str],
             country_code_to: Union[Area, str], start: pd.Timestamp,
@@ -1729,7 +1729,7 @@ class EntsoePandasClient(EntsoeRawClient):
         ts = ts.truncate(before=start, after=end)
         return ts
 
-    @year_limited
+    @month_limited
     def query_scheduled_exchanges(
             self, country_code_from: Union[Area, str],
             country_code_to: Union[Area, str],
@@ -2077,7 +2077,7 @@ class EntsoePandasClient(EntsoeRawClient):
         df = df.truncate(before=start, after=end)
         return df
 
-    @year_limited
+    @month_limited
     def query_current_balancing_state(
             self, country_code: Union[Area, str], start: pd.Timestamp,
             end: pd.Timestamp) -> pd.DataFrame:
@@ -2168,7 +2168,7 @@ class EntsoePandasClient(EntsoeRawClient):
         df = df.truncate(before=start, after=end)
         return df
 
-    @year_limited
+    @month_limited
     @paginated
     @documents_limited(100)
     def query_contracted_reserve_prices(
@@ -2208,7 +2208,7 @@ class EntsoePandasClient(EntsoeRawClient):
         df = df.truncate(before=start, after=end)
         return df
     
-    @year_limited
+    @month_limited
     @paginated
     @documents_limited(100)
     def query_contracted_reserve_prices_procured_capacity(
