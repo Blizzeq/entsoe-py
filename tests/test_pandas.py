@@ -1,7 +1,10 @@
 from itertools import product
 import os
+import warnings
 from dotenv import load_dotenv
 from entsoe import EntsoePandasClient
+from entsoe.decorators import documents_limited
+from entsoe.exceptions import NoMatchingDataError
 import pandas as pd
 import pytest
 
@@ -178,3 +181,53 @@ def test_query_withdrawn_unavailability_of_generation_units(
         country_code, start, end,
     )
     basic_checks(result, timeseries=False)
+
+
+# The query functions below stand in for the API layer so these run offline,
+# the decorator under test is the real one. Offset cap handling per #544.
+PAGE_SIZE = 200
+OFFSET_CAP = 4800
+
+
+def page(offset: int) -> pd.DataFrame:
+    """One document, identified by the offset it was fetched at."""
+    return pd.DataFrame({"offset": [offset]}, index=[pd.Timestamp("2026-01-01") + pd.Timedelta(hours=offset)])
+
+
+@documents_limited(PAGE_SIZE)
+def query_endless(*args, offset=0, **kwargs):
+    """A server that never says it is out of data."""
+    return page(offset)
+
+
+@documents_limited(PAGE_SIZE)
+def query_three_pages(*args, offset=0, **kwargs):
+    """A server that runs out of data well before the cap."""
+    if offset >= 3 * PAGE_SIZE:
+        raise NoMatchingDataError
+    return page(offset)
+
+
+def test_documents_limited_warns_when_it_stops_at_the_cap():
+    with pytest.warns(UserWarning, match="offset limit"):
+        result = query_endless()
+
+    # Every offset up to and including the cap was fetched, as before.
+    assert list(result["offset"]) == list(range(0, OFFSET_CAP + PAGE_SIZE, PAGE_SIZE))
+
+
+def test_documents_limited_is_quiet_when_the_data_runs_out():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = query_three_pages()
+
+    assert list(result["offset"]) == [0, PAGE_SIZE, 2 * PAGE_SIZE]
+
+
+def test_documents_limited_still_raises_when_there_is_nothing():
+    @documents_limited(PAGE_SIZE)
+    def query_empty(*args, offset=0, **kwargs):
+        raise NoMatchingDataError
+
+    with pytest.raises(NoMatchingDataError):
+        query_empty()
